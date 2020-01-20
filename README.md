@@ -26,19 +26,23 @@ Raspberry Pi controller for switching on a generator when a solar battery bank a
 
 # Setup
 
-Below is the setup for the system
+Below is the setup for the system, which will let you log in with `ssh gen@generator.local` on your local wifi network.
 
-## 0. Set computer name, user name and password
+
+## 0. Set computer name, user/password and Wifi
+
+We need to change from `pi` as the user and set a host name which makes sense. Usually this is a lot of menus so this simplifies it into a few scripts.
 
 |            |            |
 | ---------- | ---------- |
 | Hostname   | generator  |
-| User       | generator  |
+| User       | gen  |
 | Password   | vine generator |
+
 
 ### Hostname
 
-Change Hostname to `generator` with a script
+Change Hostname to `generator` with a script from the command line.
 
 ```
 host_name=generator
@@ -50,13 +54,53 @@ systemctl restart avahi-daemon
 
 ### User and Password
 
-Change default `pi` user to `generator` and set password to `vine generator`
+Change default `pi` user to `gen` and set password to `vine generator`
 
 ```
-sudo usermod -l generator -d  /home/generator -m pi
-usermod -c "Vine View Generator" generator
-echo "vine generator" | passwd --stdin generator
+sudo usermod -l gen -d  /home/gen -m pi
+usermod -c "Vine View Generator" gen
+echo "vine generator" | passwd --stdin gen
 ```
+
+## 1. Set up Wifi
+
+This script will set or change which wifi you connect to on boot from now on.
+
+```
+curl -o ~/wifi_setup.sh https://gist.githubusercontent.com/rjsteinert/4999792f4a7aedd532b2/raw/6f7943aea1b38ad9e7c2fb4db76015c9b4a6b306/wpa2-wifi-connect.sh
+
+# Put in your wifi and password here
+sh ~/wifi_setup.sh SSID PASSWORD
+```
+
+Install a daemon which lets you see the localhost hostname rather than hunting for the local IP address.
+
+```
+sudo apt-get install avahi-daemon
+
+sudo cat >> /etc/avahi/services/multiple.service <<EOL
+<?xml version="1.0" standalone='no'?>
+<!DOCTYPE service-group SYSTEM "avahi-service.dtd">
+<service-group>
+        <name replace-wildcards="yes">%h</name>
+        <service>
+                <type>_device-info._tcp</type>
+                <port>0</port>
+                <txt-record>model=RackMac</txt-record>
+        </service>
+        <service>
+                <type>_ssh._tcp</type>
+                <port>22</port>
+        </service>
+</service-group>
+EOL
+
+sudo /etc/init.d/avahi-daemon restart
+```
+
+
+`ssh gen@generator.local`
+
 
 
 
