@@ -28,7 +28,43 @@ Raspberry Pi controller for switching on a generator when a solar battery bank a
 
 Below is the setup for the system
 
+## 0. Set computer name, user name and password
+
+|            |            |
+| ---------- | ---------- |
+| Hostname   | generator  |
+| User       | generator  |
+| Password   | vine generator |
+
+### Hostname
+
+Change Hostname to `generator` with a script
+
+```
+host_name=generator
+echo $host_name | tee /etc/hostname
+sed -i -E 's/^127.0.1.1.*/127.0.1.1\t'"$host_name"'/' /etc/hosts
+hostnamectl set-hostname $host_name
+systemctl restart avahi-daemon
+```
+
+### User and Password
+
+Change default `pi` user to `generator` and set password to `vine generator`
+
+```
+sudo usermod -l generator -d  /home/generator -m pi
+usermod -c "Vine View Generator" generator
+echo "vine generator" | passwd --stdin generator
+```
+
+
+
 ## 1. Base OS Update
+
+```
+
+```
 
 ```
 # First time setup
