@@ -9,11 +9,18 @@ import logging
 import platform
 import threading
 from scripts import generator_loggers
+from scripts import test_display as display
 
-is_simulator = True or "Darwin" in platform.platform()
+logger = logging.getLogger("generator")
+
+
+is_simulator = "Darwin" in platform.platform()
+is_enabled = True
+is_generator_on = False
 params = {}
 
 if not is_simulator:
+    logger.info("Running on Raspberry Pi, not simulator")
     import automationhat
 
 def load_params( ):
@@ -52,8 +59,9 @@ def get_battery_voltage( ):
     '''
     global params
 
-    voltage =  load_simulator()["analog.one"] if is_simulator else automationhat.analog.one.read()
 
+    voltage =  load_simulator()["analog.one"] if is_simulator else automationhat.analog.one.read()
+    
     return voltage*params["voltage_multiplier"] + params["voltage_offset"]
 
 
@@ -75,11 +83,15 @@ def set_generator( state ):
     '''
 
     '''
+    global is_generator_on
+
     if not is_simulator:
         if state is "on":
             automationhat.relay.one.on()
+            is_generator_on = True
         elif state is "off":
             automationhat.relay.one.off()
+            is_generator_on = False
 
 
 def is_voltage_low( ):
@@ -205,15 +217,26 @@ def charge_batteries_with_generator( ):
 
 def threaded_display( ):
 
+    global is_enabled
+
+    time_of_button = 0
+
     while True:
-        sleep(10)
-        logger.info("Voltage: " + str(round(get_battery_voltage(),1)) + " volts. Current: " + str(round(get_ac_current_amps(),2)) + " amps.")
+        sleep(0.1)
+        #logger.info("Voltage: " + str(round(get_battery_voltage(),1)) + " volts. Current: " + str(round(get_ac_current_amps(),2)) + " amps.")
+
+        if time() - time_of_button > 1:
+            if display.is_button_a_pressed():
+                time_of_button = time()
+                is_enabled = not is_enabled
+
+        display.render(is_enabled, is_generator_on, get_battery_voltage(), get_ac_current_amps())
 
 
 def self_test( ):
     logger.debug("Turning on generator")
     set_generator("on")
-    sleep(2)
+    sleep(10)
     set_generator("off")
     logger.debug("Turning off generator")
     
@@ -223,8 +246,6 @@ def self_test( ):
     
 if __name__ == "__main__":
     
-    logger = logging.getLogger("generator")
-
     params = load_params()
 
     logger.info("")
@@ -239,7 +260,7 @@ if __name__ == "__main__":
         logger.info("    " + p + ": " + str(params[p]))
     logger.info("")
     
-    self_test()
+    # self_test()
 
     thread_current = threading.Thread(target=threaded_measure_current, name='Measure Current', daemon=True)
     thread_current.start()
