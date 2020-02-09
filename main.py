@@ -12,7 +12,6 @@ from scripts import generator_loggers
 
 logger = logging.getLogger("generator")
 
-
 is_simulator = "Darwin" in platform.platform() or "mac" in platform.platform()
 
 if not is_simulator:
