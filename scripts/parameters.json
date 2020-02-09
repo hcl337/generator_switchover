@@ -1,0 +1,10 @@
+{
+	"low_charge_voltage": 50.0,
+	"full_charge_voltage": 57.6,
+	"maximum_time_charging_to_full_voltage": 3600,
+	"minimum_charge_length_seconds": 3600,
+	"maximum_charge_length_seconds": 7200,
+	"voltage_divider": 3.0,
+	"ac_current_divider": 10.0,
+	"low_voltage_secs_before_generator": 120
+}

@@ -24,10 +24,21 @@ Raspberry Pi controller for switching on a generator when a solar battery bank a
 * [Python Library Automation Hat](https://github.com/pimoroni/automation-hat)
 * 
 
-# Setup
+# Raspberry Pi Compute Setup
 
-Below is the setup for the system, which will let you log in with `ssh gen@generator.local` on your local wifi network.
+Below is the setup for the system, which will let you log in with `ssh gen@generator.local` on your local wifi network. The easiest way to do this is to first enable SSH and then log in remotely to do the rest so you can copy and paste.
 
+## 00. Set up remote login
+
+### SSH
+
+Enable SSH
+```
+sudo systemctl enable ssh
+sudo systemctl start ssh
+```
+
+Now, make sure you connect to the same wifi network and try logging in with `ssh pi@raspberrypi.local`  from your remote computer.
 
 ## 0. Set computer name, user/password and Wifi
 
@@ -39,17 +50,15 @@ We need to change from `pi` as the user and set a host name which makes sense. U
 | User       | gen  |
 | Password   | vine generator |
 
-
 ### Hostname
 
 Change Hostname to `generator` with a script from the command line.
 
 ```
 host_name=generator
-echo $host_name | tee /etc/hostname
-sed -i -E 's/^127.0.1.1.*/127.0.1.1\t'"$host_name"'/' /etc/hosts
+sudo bash -c "echo $host_name | tee /etc/hostname"
+sudo bash -c "sed -i -E 's/^127.0.1.1.*/127.0.1.1\t'\"$host_name\"'/' /etc/hosts"
 hostnamectl set-hostname $host_name
-systemctl restart avahi-daemon
 ```
 
 ### User and Password
@@ -57,9 +66,12 @@ systemctl restart avahi-daemon
 Change default `pi` user to `gen` and set password to `vine generator`
 
 ```
-sudo usermod -l gen -d  /home/gen -m pi
-usermod -c "Vine View Generator" gen
-echo "vine generator" | passwd --stdin gen
+sudo useradd gen
+sudo passwd gen
+# enter "vine generator"
+sudo usermod -aG sudo gen
+sudo nano /etc/sudoers
+# Add ALL            ALL = (ALL) NOPASSWD: ALL
 ```
 
 ## 1. Set up Wifi
@@ -118,6 +130,8 @@ sudo apt-get install python3-pip
 sudo pip3 install --upgrade setuptools
 ```
 
+
+
 ## 2. Setup I2C + SPI
 
 https://learn.adafruit.com/adafruits-raspberry-pi-lesson-4-gpio-setup/configuring-i2c
@@ -132,8 +146,6 @@ sudo apt-get install -y i2c-tools
 * Reboot - `sudo reboot`
 * Test I2C - `sudo i2cdetect -y 1` - And should see some
 * Test SPI - `ls -l /dev/spidev*` - And should see some
-
-
 
 # Display
 ```
