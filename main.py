@@ -144,6 +144,10 @@ def threaded_charge_batteries( ):
     while True:
 
         sleep(10)
+
+        if not is_enabled:
+            continue
+
         if get_battery_voltage() < params["low_charge_voltage"]:
 
             # If we have a low voltage, set the start time
@@ -182,7 +186,7 @@ def charge_batteries_with_generator( ):
         # STEP 1 - BRING TO 57.6 V. THIS MAY TAKE AN HOUR?
         ######################################################################
 
-        while elapsed < params["maximum_seconds_charging_to_full_voltage"]:
+        while elapsed < params["maximum_seconds_charging_to_full_voltage"] and is_enabled:
             sleep(10)
             elapsed = time() - start_time
             if get_battery_voltage() > params["full_charge_voltage"]:
@@ -199,7 +203,7 @@ def charge_batteries_with_generator( ):
         start_trickle_charge = time()
         elapsed_trickle_charge = 0
 
-        while elapsed_trickle_charge < params["trickle_charge_time"]:
+        while elapsed_trickle_charge < params["trickle_charge_time"] and is_enabled:
             sleep(60)
             logger.debug("    " + str(round(elapsed/60)) + " min. Voltage: " + str(round(get_battery_voltage(), 1)))
             
@@ -211,6 +215,10 @@ def charge_batteries_with_generator( ):
     except Exception as e:
         logger.exception("Exception while charging batteries with generator")
     finally:
+
+        if not is_enabled:
+            logger.info("Canceled due to being disabled.")
+
         logger.info("Ended charging after " + str(elapsed/60) + " minutes.")
         set_generator("off")
 
