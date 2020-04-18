@@ -76,7 +76,7 @@ def get_ac_current_amps( ):
 
     amps = load_simulator()["analog.two"] if is_simulator else automationhat.analog.two.read()
 
-    return  amps*amps*params["ac_current_multiplier_2"] + amps*params["ac_current_multiplier"] + params["ac_current_offset"]
+    return  (amps*amps*params["ac_current_multiplier_2"] + amps*params["ac_current_multiplier"] + params["ac_current_offset"])*params["ac_current_divider"]
 
 
 def set_generator( state ):
