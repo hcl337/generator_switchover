@@ -9,14 +9,18 @@ import logging
 import platform
 import threading
 from scripts import generator_loggers
-from scripts import test_display as display
 
 logger = logging.getLogger("generator")
 
 
-is_simulator = "Darwin" in platform.platform()
+is_simulator = "Darwin" in platform.platform() or "mac" in platform.platform()
+
+if not is_simulator:
+    from scripts import display
+
 is_enabled = True
 is_generator_on = False
+message = "<>"
 params = {}
 
 if not is_simulator:
@@ -86,10 +90,10 @@ def set_generator( state ):
     global is_generator_on
 
     if not is_simulator:
-        if state is "on":
+        if state == "on":
             automationhat.relay.one.on()
             is_generator_on = True
-        elif state is "off":
+        elif state == "off":
             automationhat.relay.one.off()
             is_generator_on = False
 
@@ -161,11 +165,57 @@ def threaded_charge_batteries( ):
             if elapsed_low_voltage_time > params["low_voltage_secs_before_generator"]:
                 time_of_low_voltage = None
                 charge_batteries_with_generator( )
-                sleep(3600) # Don't try again for an hour
+                sleep(3600*5) # Don't try again for a few hours
         elif time_of_low_voltage is not None:
             time_of_low_voltage = None
             logger.info("Voltage is above minimum again. Canceling countdown")
  
+def threaded_log_data( ):
+    """
+    Write to a CSV file at a standard interval except when the generator starts, where
+    we want to start writing at a faster rate to see what is going on
+    """
+
+    global is_generator_on, is_enabled
+
+    was_generator_on = False
+    time_generator_started = 0
+    time_of_last_write = 0
+    write_interval = 60
+
+    try:
+        with open("./data.csv", "a+") as file:
+            sleep(1)
+            while True:
+
+                if is_generator_on and not was_generator_on:
+                    time_generator_started = time()
+                    was_generator_on = True
+
+                if not is_generator_on:
+                    was_generator_on = False
+
+                # When the generator starts up, we want to have high resolution
+                # data to see how it starts, so let it jump
+                if time() - time_generator_started < 10:
+                    write_interval = 1
+                elif time() - time_generator_started < 60:
+                    write_interval = 5
+                elif time() - time_generator_started < 60*5:
+                    write_interval = 30
+                else:
+                    write_interval = 60
+
+                if time() - time_of_last_write < write_interval:
+                    sleep(0.5)
+                    time_of_last_write = time()
+
+                data_str = str(time()) + ", " + str(is_enabled) + ", " + str(get_battery_voltage()) + ", " + str(get_ac_current_amps()) + ", " + str(message) + "\n"
+                file.write(data_str)
+
+    except Exception as e:
+        is_enabled = False
+        logger.exception("Exception in data logging thread: " + str(e))
 
 def charge_batteries_with_generator( ):
     '''
@@ -174,13 +224,31 @@ def charge_batteries_with_generator( ):
     57.6 volts and then sit there for a period of time.
     '''
 
+    global is_enabled, message
+
     logger.info("Starting to charge because voltage is low ")
     start_time = time()
     elapsed = 0
 
     try:
 
+        initial_voltage = get_battery_voltage()
+
         set_generator("on")
+
+        ######################################################################
+        # STEP 0 - make sure it turns on. If not, then disable it all
+        ######################################################################
+
+        sleep(10)
+
+        charging_voltage = get_battery_voltage()
+
+        # Voltage should go up a bunch when the generator turns on. If it doesn't, we have something wrong
+        # and most likely the generator didn't actually start up because it was out of gas.
+        if charging_voltage < initial_voltage + 2:
+            message = "ERR: NO GEN START"
+            raise Exception("Tried tot turn on generator but voltage did not increase (before: " + str(initial_voltage) + " after " + str(charging_voltage) + ") so must be out of gas.")
 
         ######################################################################
         # STEP 1 - BRING TO 57.6 V. THIS MAY TAKE AN HOUR?
@@ -188,6 +256,11 @@ def charge_batteries_with_generator( ):
 
         while elapsed < params["maximum_seconds_charging_to_full_voltage"] and is_enabled:
             sleep(10)
+
+            if is_voltage_low():
+                message = "ERR: GEN STOPPED 1"
+                raise Exception("While charging, went to low voltage, so the generator is out of gas or shut off.")
+
             elapsed = time() - start_time
             if get_battery_voltage() > params["full_charge_voltage"]:
                 logger.info("Full voltage during charging after " + str(elapsed/60) + " minutes.")
@@ -206,6 +279,10 @@ def charge_batteries_with_generator( ):
         while elapsed_trickle_charge < params["trickle_charge_time"] and is_enabled:
             sleep(60)
             logger.debug("    " + str(round(elapsed/60)) + " min. Voltage: " + str(round(get_battery_voltage(), 1)))
+
+            if is_voltage_low():
+                message = "ERR: GEN STOPPED 2"
+                raise Exception("While charging, went to low voltage, so the generator is out of gas or shut off.")
             
             if get_battery_voltage() > params["over_voltage"]:
                 logger.info("    Battery hit maximum voltage so stopping charge")
@@ -213,7 +290,8 @@ def charge_batteries_with_generator( ):
         
         logger.info("CHARGE COMPLETE AFTER " + str(charge_minutes) + " minutes.")
     except Exception as e:
-        logger.exception("Exception while charging batteries with generator")
+        logger.exception("Exception while charging batteries with generator: " + str(e))
+        is_enabled = False
     finally:
 
         if not is_enabled:
@@ -225,7 +303,7 @@ def charge_batteries_with_generator( ):
 
 def threaded_display( ):
 
-    global is_enabled
+    global is_enabled, message
 
     time_of_button = 0
 
@@ -233,12 +311,22 @@ def threaded_display( ):
         sleep(0.1)
         #logger.info("Voltage: " + str(round(get_battery_voltage(),1)) + " volts. Current: " + str(round(get_ac_current_amps(),2)) + " amps.")
 
-        if time() - time_of_button > 1:
-            if display.is_button_a_pressed():
-                time_of_button = time()
-                is_enabled = not is_enabled
+        if not is_simulator:
 
-        display.render(is_enabled, is_generator_on, get_battery_voltage(), get_ac_current_amps())
+            if time() - time_of_button > 1:
+                if display.is_button_a_pressed():
+                    time_of_button = time()
+                    is_enabled = not is_enabled
+
+                    # Clear any old messages when we toggle enabling it
+                    message = "< >"
+
+            display.render(is_enabled, is_generator_on, get_battery_voltage(), get_ac_current_amps(), message)
+        else:
+            sleep(0.1)
+
+            print("                                                                                ", end="\r")
+            print(str(time()) + "," + str(is_enabled) + " " + str(is_generator_on) + " " + str(get_battery_voltage()) + " " + str(get_ac_current_amps()) + " " + message, end='\r')
 
 
 def self_test( ):
@@ -278,6 +366,9 @@ if __name__ == "__main__":
 
     thread_display = threading.Thread(target=threaded_display, name='Display', daemon=True)
     thread_display.start()
+
+    thread_data = threading.Thread(target=threaded_log_data, name='Data Logging', daemon=True)
+    thread_data.start()
 
     while True:
         sleep(1)

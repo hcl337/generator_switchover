@@ -1,3 +1,4 @@
+import os
 import sys
 import logging
 from logging.handlers import RotatingFileHandler
@@ -8,6 +9,9 @@ logger.setLevel("DEBUG")
 formatter = logging.Formatter(
         fmt='%(asctime)s %(module)s,line: %(lineno)d %(levelname)8s | %(message)s',
         datefmt='%Y/%m/%d %H:%M:%S') # %I:%M:%S %p AM|PM format
+
+if not os.path.exists('./logs/'):
+    os.makedirs('./logs/')
 
 # File logger 10M max
 logger_fh = RotatingFileHandler('./logs/generator.log', mode='a', maxBytes=10*1024*1024, 
