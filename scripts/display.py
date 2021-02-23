@@ -40,16 +40,8 @@ image = Image.new('RGB', (width, height))
 rotation = 270
 draw = ImageDraw.Draw(image)
 
-draw.rectangle((0,0,width-2, height-2), outline='yellow', fill=(0,0,0))
+draw.rectangle((0,0,width-2, height-2), outline='yellow', fill='yellow')
 
-draw.text((10,FONTSIZE),       "ENABLED:   ", font=font, color=(255,255,255))
-draw.text((10,2*(FONTSIZE+3)), "GENERATOR: ", font=font, color=(255,255,255))
-draw.text((10,3*(FONTSIZE+3)), "VOLTAGE:   ", font=font, color=(255,255,255))
-draw.text((10,4*(FONTSIZE+3)), "CURRENT:   ", font=font, color=(255,255,255))
-
-#(font_width, font_height) = font.getsize(text)
-#draw.text((width//2 - font_width//2, height//2 - font_height//2),
-#          text, font=font, fill=(255, 255, 0), color=(50,50,100))
 
 display.image(image, rotation)
 
