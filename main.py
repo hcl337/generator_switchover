@@ -8,6 +8,8 @@ from time import time, sleep
 import logging
 import platform
 import threading
+import atexit
+
 from scripts import generator_loggers
 
 logger = logging.getLogger("generator")
@@ -22,6 +24,7 @@ is_generator_on = False
 message = "<>"
 params = {}
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
 
 if not is_simulator:
     logger.info("Running on Raspberry Pi, not simulator")
@@ -93,9 +96,11 @@ def set_generator( state ):
         if state == "on":
             automationhat.relay.one.on()
             is_generator_on = True
+            logger.info("Generator on")
         elif state == "off":
             automationhat.relay.one.off()
             is_generator_on = False
+            logger.info("Generator on")
 
 
 def is_voltage_low( ):
@@ -334,46 +339,64 @@ def threaded_display( ):
 
 def self_test( ):
     logger.debug("Turning on generator")
+    starting_voltage = get_battery_voltage()
     set_generator("on")
-    sleep(10)
+    sleep(30)
+    ending_voltage = get_battery_voltage()
     set_generator("off")
     logger.debug("Turning off generator")
     
+    logger.info("Initial battery voltage before test: " + str(starting_voltage))
+    logger.info("Ending battery voltage after test: " + str(ending_voltage))
+
     sleep(1)
     logger.debug("Done with self test")
-    
+
+    if ending_voltage - starting_voltage < 0.1:
+        
+        logger.info("Failed self test. Generator did not raise voltage after 30 seconds of running")
+        raise
     
 if __name__ == "__main__":
+
+
+    try:    
+        params = load_params()
+
+        logger.info("")
+        logger.info("################################################################################")
+        logger.info("STARTED GENERATOR CONTROL PROGRAM")
+        logger.info("################################################################################")
+
+        logger.info("")
+        logger.info("Parameters:")
+
+        for p in params:
+            logger.info("    " + p + ": " + str(params[p]))
+        logger.info("")
     
-    params = load_params()
+        thread_current = threading.Thread(target=threaded_measure_current, name='Measure Current', daemon=True)
+        thread_current.start()
 
-    logger.info("")
-    logger.info("################################################################################")
-    logger.info("STARTED GENERATOR CONTROL PROGRAM")
-    logger.info("################################################################################")
+        thread_charge = threading.Thread(target=threaded_charge_batteries, name='Charge Batteries', daemon=True)
+        thread_charge.start()
 
-    logger.info("")
-    logger.info("Parameters:")
+        thread_display = threading.Thread(target=threaded_display, name='Display', daemon=True)
+        thread_display.start()
 
-    for p in params:
-        logger.info("    " + p + ": " + str(params[p]))
-    logger.info("")
-    
-    # self_test()
+        thread_data = threading.Thread(target=threaded_log_data, name='Data Logging', daemon=True)
+        thread_data.start()
 
-    thread_current = threading.Thread(target=threaded_measure_current, name='Measure Current', daemon=True)
-    thread_current.start()
+        try:
+            self_test()
+        except:
+            is_enabled = False
+            message = "Failed Self Test"
+        else:
+            message = "Passed Self Test"
 
-    thread_charge = threading.Thread(target=threaded_charge_batteries, name='Charge Batteries', daemon=True)
-    thread_charge.start()
+        while True:
+            sleep(1)
 
-    thread_display = threading.Thread(target=threaded_display, name='Display', daemon=True)
-    thread_display.start()
-
-    thread_data = threading.Thread(target=threaded_log_data, name='Data Logging', daemon=True)
-    thread_data.start()
-
-    while True:
-        sleep(1)
-
-
+    finally:
+        set_generator("off")
