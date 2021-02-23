@@ -1,3 +1,4 @@
+from datetime import datetime
 import digitalio
 import board
 
@@ -89,6 +90,10 @@ def render(is_enabled, gen_on, voltage, current, message):
 
     # draw an additional line of a message
     draw.text((10,5*(FONTSIZE+3)), str(message), font=font, color=(255,255,255))
+
+    # Draw the current time so we see it change
+    date = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+    draw.text((10,6*(FONTSIZE+3)), date, font=font, color=(255,255,255))
 
 
     display.image(image, rotation)

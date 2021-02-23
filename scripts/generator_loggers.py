@@ -1,7 +1,11 @@
 import os
 import sys
+import os
 import logging
 from logging.handlers import RotatingFileHandler
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+print( BASE_DIR)
 
 #if __name__ == "__main__":
 logger = logging.getLogger("generator")
@@ -14,7 +18,7 @@ if not os.path.exists('./logs/'):
     os.makedirs('./logs/')
 
 # File logger 10M max
-logger_fh = RotatingFileHandler('./logs/generator.log', mode='a', maxBytes=10*1024*1024, 
+logger_fh = RotatingFileHandler(BASE_DIR + '/../logs/generator.log', mode='a', maxBytes=10*1024*1024, 
                                  backupCount=2, encoding=None, delay=0)
 logger_fh.setFormatter(formatter)
 logger_fh.setLevel(logging.INFO)
@@ -27,5 +31,4 @@ logger_sh.setLevel(logging.DEBUG)
 logger.addHandler(logger_sh)
 
 logger.info("Set up all loggers")
-print("asdf")
 

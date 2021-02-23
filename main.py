@@ -22,6 +22,7 @@ is_enabled = True
 is_generator_on = False
 message = "<>"
 params = {}
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 if not is_simulator:
     logger.info("Running on Raspberry Pi, not simulator")
@@ -35,7 +36,7 @@ def load_params( ):
     seconds so that you can easily edit it and adjust
 
     '''
-    with open("scripts/parameters.json") as f:
+    with open(BASE_DIR + "/scripts/parameters.json") as f:
         params = json.load(f)
 
     params["utc_load_time"] = time()
@@ -51,7 +52,7 @@ def load_simulator( ):
     the file and test things out.
 
     '''
-    with open("scripts/simulator.json") as f:
+    with open(BASE_DIR + "/scripts/simulator.json") as f:
         return json.load(f)
 
 
@@ -261,6 +262,9 @@ def charge_batteries_with_generator( ):
                 message = "ERR: GEN STOPPED 1"
                 raise Exception("While charging, went to low voltage, so the generator is out of gas or shut off.")
 
+            if not is_enabled:
+                return
+
             elapsed = time() - start_time
             if get_battery_voltage() > params["full_charge_voltage"]:
                 logger.info("Full voltage during charging after " + str(elapsed/60) + " minutes.")
@@ -283,11 +287,11 @@ def charge_batteries_with_generator( ):
             if is_voltage_low():
                 message = "ERR: GEN STOPPED 2"
                 raise Exception("While charging, went to low voltage, so the generator is out of gas or shut off.")
-            
+
             if get_battery_voltage() > params["over_voltage"]:
                 logger.info("    Battery hit maximum voltage so stopping charge")
                 break
-        
+
         logger.info("CHARGE COMPLETE AFTER " + str(charge_minutes) + " minutes.")
     except Exception as e:
         logger.exception("Exception while charging batteries with generator: " + str(e))
